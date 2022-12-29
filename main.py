@@ -2,10 +2,9 @@ import sys
 import server
 
 if __name__ == '__main__':
-    ADDR = ""
     try:
-        PORT = int(sys.argv[1])
+        port = int(sys.argv[1])
     except:
-        PORT = 7777
-    s = server.New(ADDR, PORT)
+        port = 7777
+    s = server.New("", port)
     server.Start(s, 5)
