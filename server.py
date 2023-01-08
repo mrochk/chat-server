@@ -13,6 +13,37 @@ def New(addr : str, port : int):
     server_socket.bind((addr, port))
     return server_socket
 
+def accept(server : socket.SocketType, l : list[socket.SocketType], d : dict[socket.SocketType]):
+    new_client = server.accept()
+    csock = new_client[0]
+    caddr = f"{new_client[1][0]}:{str(new_client[1][1])}"
+    l.append(csock)
+    d[csock] = caddr
+    return csock, caddr
+
+def disconnect(s : socket.SocketType, l : list[socket.SocketType], d : dict[socket.SocketType]):
+    d.pop(s)
+    l.remove(s)
+    s.close()
+
+def get_names(d : dict[socket.SocketType]):
+    names = ""
+    for s in d:
+        names += f"{d[s]} "
+    return names
+
+def send(s : socket.SocketType, data : bytes):
+    s.sendall(data)
+
+def send_all(ex : list[socket.SocketType], data : bytes, l : list[socket.SocketType]):
+    for socket in l:
+        met = False
+        for e in ex:
+            if socket == e:
+                met = True
+        if not met:
+            socket.sendall(data)
+
 def Start(server_socket : socket.SocketType, backlog : int):
     print("--Welcome to Chat Server--")
     server_socket.listen(backlog)
@@ -66,34 +97,3 @@ def Start(server_socket : socket.SocketType, backlog : int):
                     send_all([client_socket, server_socket], log.encode(), sockets)
                     disconnect(client_socket, sockets, socket_to_nick)
                     print(log, end='')
-
-def accept(server : socket.SocketType, l : list[socket.SocketType], d : dict[socket.SocketType]):
-    new_client = server.accept()
-    csock = new_client[0]
-    caddr = f"{new_client[1][0]}:{str(new_client[1][1])}"
-    l.append(csock)
-    d[csock] = caddr
-    return csock, caddr
-
-def disconnect(s : socket.SocketType, l : list[socket.SocketType], d : dict[socket.SocketType]):
-    d.pop(s)
-    l.remove(s)
-    s.close()
-
-def get_names(d : dict[socket.SocketType]):
-    names = ""
-    for s in d:
-        names += f"{d[s]} "
-    return names
-
-def send(s : socket.SocketType, data : bytes):
-    s.sendall(data)
-
-def send_all(ex : list[socket.SocketType], data : bytes, l : list[socket.SocketType]):
-    for socket in l:
-        met = False
-        for e in ex:
-            if socket == e:
-                met = True
-        if not met:
-            socket.sendall(data)
