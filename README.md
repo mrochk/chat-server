@@ -1,12 +1,15 @@
 # Chat Server
-Simple chat server i did for a college homework.
+Simple chat server I did for an assignment.
 
-Runs by default on port 7777.
+List of commands that can be used:
+- **MSG** `<msg>`: Send a message to all connected clients.
+- **NICK** `<name>`: Change nickname.
+- **NAMES**: Return the list of all connected client's nickname (if set, otherwise their address).
+- **KILL** `<name> <msg>`: Disconnect a client from the server by his nickname, after sending him a message.
+- **QUIT**: Quit the server.
 
-There is a list of commands that can be used by connected clients :
-
-- **MSG** `<msg>` : Sends a message to all connected users.
-- **NICK** `<nick>` : Changes user's own nickname.
-- **NAMES** : Returns the list of all connected clients nicknames if set (otherwise their addr).
-- **KILL** `<nick> <msg>` : Disconnects any client from the server by his nickname, after sending him a message.
-- **QUIT** : Properly disconnect from the server.
+Usage:
+```
+python3 main.py <port>
+```
+*Runs on port 7777 if not argument provided.*
