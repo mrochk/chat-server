@@ -1,99 +1,128 @@
 import socket
 import select
 
-CMD_MSG   = 'MSG'
-CMD_NICK  = 'NICK'
-CMD_NAMES = 'NAMES'
-CMD_KILL  = 'KILL'
-CMD_QUIT  = 'QUIT'
+class Server:
+    __CMD_MSG = "MSG"
+    __CMD_NICK = "NICK"
+    __CMD_NAMES = "NAMES"
+    __CMD_KILL = "KILL"
+    __CMD_QUIT = "QUIT"
 
-def New(addr : str, port : int):
-    server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM, 0)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR | socket.SO_REUSEPORT, 1)
-    server_socket.bind((addr, port))
-    return server_socket
+    def __init__(self, address, port):
+        """
+        Attributes:
+            socket: The server socket.
+            sockets: List of client's sockets.
+            sockets_to_addr: Dict matching sockets to a string "addr:port".
+        """
+        self.__socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM, 0)
+        self.__socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.__socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        self.__socket.bind((address, port))
 
-def accept(server : socket.SocketType, l : list[socket.SocketType], d : dict[socket.SocketType]):
-    new_client = server.accept()
-    csock = new_client[0]
-    caddr = f"{new_client[1][0]}:{str(new_client[1][1])}"
-    l.append(csock)
-    d[csock] = caddr
-    return csock, caddr
+    def __accept(self):
+        clientsocket, clientaddr = self.__socket.accept()
+        address = f"{clientaddr[0]}:{str(clientaddr[1])}"
+        self.__sockets.append(clientsocket)
+        self.__sockets_to_addr[clientsocket] = address
+        return clientsocket, address
 
-def disconnect(s : socket.SocketType, l : list[socket.SocketType], d : dict[socket.SocketType]):
-    d.pop(s)
-    l.remove(s)
-    s.close()
+    def __disconnect(self, client):
+        self.__sockets_to_addr.pop(client)
+        self.__sockets.remove(client)
+        client.close()
 
-def get_names(d : dict[socket.SocketType]):
-    names = ""
-    for s in d:
-        names += f"{d[s]} "
-    return names
+    def __get_names(self):
+        names = ""
+        for socket in self.__sockets_to_addr:
+            names += f"{self.__sockets_to_addr[socket]} "
+        return names
 
-def send(s : socket.SocketType, data : bytes):
-    s.sendall(data)
+    def __send(self, client, data):
+        client.sendall(data)
 
-def send_all(ex : list[socket.SocketType], data : bytes, l : list[socket.SocketType]):
-    for socket in l:
-        met = False
-        for e in ex:
-            if socket == e:
-                met = True
-        if not met:
-            socket.sendall(data)
+    def __send_all(self, excluded, data):
+        for socket in self.__sockets:
+            met = False
+            for ex in excluded:
+                if socket == ex:
+                    met = True
+            if not met:
+                socket.sendall(data)
 
-def Start(server_socket : socket.SocketType, backlog : int):
-    print("--Welcome to Chat Server--")
-    server_socket.listen(backlog)
-    sockets = [server_socket]
-    socket_to_nick = {server_socket:"server"}
-    while True:
-        ready_for_reading_sockets = select.select(sockets, [], [])[0]
-        for client_socket in ready_for_reading_sockets:
-            if client_socket == server_socket:
-                csock, caddr = accept(client_socket, sockets, socket_to_nick)
-                log = f"client connected \"{caddr}\"\n"
-                send_all([csock, server_socket], log.encode(), sockets)
-                print(log, end='')
-            else:
-                raw_request = client_socket.recv(1500)
-                request = raw_request.decode('utf-8')
-                if len(raw_request) > 0:
-                    if CMD_MSG in request:
-                        msg = f"[{socket_to_nick[client_socket]}] "
-                        msg += request.removeprefix(f"{CMD_MSG} ")
-                        send_all([client_socket, server_socket], msg.encode(), sockets)
-                    elif CMD_NAMES in request:
-                        msg = f"[{socket_to_nick[server_socket]}] {get_names(socket_to_nick)}\n"
-                        send(client_socket, msg.encode())
-                    elif CMD_NICK in request:
-                        nick = request.removeprefix(f"{CMD_NICK} ").removesuffix('\n')
-                        log = f"client \"{socket_to_nick[client_socket]}\" => \"{nick}\""
-                        socket_to_nick[client_socket] = nick
-                        print(log)
-                    elif CMD_KILL in request:
-                        to_kill = request.split()[1]
-                        msg = f"[{socket_to_nick[client_socket]}] "
-                        msg += request.removeprefix(f"{CMD_KILL} {to_kill} ")
-                        for i in socket_to_nick:
-                            if socket_to_nick[i] == to_kill:
-                                sock_to_kill = i
-                                break
-                        log = f"client disconnected \"{socket_to_nick[sock_to_kill]}\"\n"
-                        send(sock_to_kill, msg.encode())
-                        disconnect(sock_to_kill, sockets, socket_to_nick)
-                        send_all([client_socket, server_socket], log.encode(), sockets)
-                        print(log, end='')
-                    elif CMD_QUIT in request:
-                        msg = f"[{socket_to_nick[client_socket]}] {request.removeprefix('QUIT ')}"
-                        log = f"client disconnected \"{socket_to_nick[client_socket]}\""
-                        send_all([client_socket, server_socket], msg.encode(), sockets)
-                        disconnect(client_socket, sockets, socket_to_nick)
-                        print(log)
+    def __handle_new(self):
+        clientsock, clientaddr = self.__accept()
+        log = f'client connected "{clientaddr}"\n'
+        self.__send_all([clientsock, self.__socket], log.encode())
+        print(log, end="")
+
+    def __handle_message(self, client, request):
+        msg = f"[{self.__sockets_to_addr[client]}] "
+        msg += request.removeprefix(f"{self.__CMD_MSG} ")
+        self.__send_all([client, self.__socket], msg.encode())
+
+    def __handle_names(self, client):
+        msg = f"[{self.__sockets_to_addr[self.__socket]}] {self.__get_names()}\n"
+        self.__send(client, msg.encode("utf-8"))
+
+    def __handle_nickname(self, client, request):
+        nick = request.removeprefix(f"{self.__CMD_NICK} ").removesuffix("\n")
+        log = f'client "{self.__sockets_to_addr[client]}" => "{nick}"'
+        self.__sockets_to_addr[client] = nick
+        print(log)
+
+    def __handle_kill(self, client, request):
+        tokill = request.split()[1]
+        msg = f"[{self.__sockets_to_addr[client]}] "
+        msg += request.removeprefix(f"{self.__CMD_KILL} {tokill} ")
+        for socket in self.__sockets_to_addr:
+            if self.__sockets_to_addr[socket] == tokill:
+                sock_to_kill = socket
+                break
+        log = f'client disconnected "{self.__sockets_to_addr[sock_to_kill]}"\n'
+        self.__send(sock_to_kill, msg.encode())
+        self.__disconnect(sock_to_kill)
+        self.__send_all([client, self.__socket], log.encode())
+        print(log, end="")
+
+    def __handle_quit(self, client, request):
+        msg = f"[{self.__sockets_to_addr[client]}] {request.removeprefix('QUIT ')}"
+        log = f'client disconnected "{self.__sockets_to_addr[client]}"'
+        self.__send_all([client, self.__socket], msg.encode())
+        self.__disconnect(client)
+        print(log)
+
+    def __handle_lostconn(self, client):
+        log = f'client disconnected "{self.__sockets_to_addr[client]}"\n'
+        self.__send_all([client, self.__socket], log.encode())
+        self.__disconnect(client)
+        print(log, end="")
+
+    def start(self, backlog):
+        print("((( Starting Server )))")
+
+        self.__socket.listen(backlog)
+        self.__sockets = [self.__socket]
+        self.__sockets_to_addr = {self.__socket: "server"}
+
+        while True:
+            ready_sockets = select.select(self.__sockets, [], [])[0]
+            for socket in ready_sockets:
+                if socket == self.__socket:
+                    self.__handle_new()
                 else:
-                    log = f"client disconnected \"{socket_to_nick[client_socket]}\"\n"
-                    send_all([client_socket, server_socket], log.encode(), sockets)
-                    disconnect(client_socket, sockets, socket_to_nick)
-                    print(log, end='')
+                    raw_request = socket.recv(1500)
+                    request = raw_request.decode("utf-8")
+                    if len(raw_request) > 0:
+                        if self.__CMD_MSG in request:
+                            self.__handle_message(socket, request)
+                        elif self.__CMD_NAMES in request:
+                            self.__handle_names(socket)
+                        elif self.__CMD_NICK in request:
+                            self.__handle_nickname(socket, request)
+                        elif self.__CMD_KILL in request:
+                            self.__handle_kill(socket, request)
+                        elif self.__CMD_QUIT in request:
+                            self.__handle_quit(socket, request)
+                    else:
+                        self.__handle_lostconn(socket)
