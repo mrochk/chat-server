@@ -1,5 +1,5 @@
 # Chat Server
-Simple chat server I did for an assignment.
+A simple IRC-like chat server I made for a college assignment.
 
 List of commands that can be used:
 - **MSG** `<msg>`: Send a message to all connected clients.
@@ -12,4 +12,3 @@ Usage:
 ```
 python3 main.py <port>
 ```
-*Runs on port 7777 if not argument provided.*

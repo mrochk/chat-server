@@ -2,11 +2,11 @@ import socket
 import select
 
 class Server:
-    __CMD_MSG = "MSG"
-    __CMD_NICK = "NICK"
+    __CMD_MSG   = "MSG"
+    __CMD_NICK  = "NICK"
     __CMD_NAMES = "NAMES"
-    __CMD_KILL = "KILL"
-    __CMD_QUIT = "QUIT"
+    __CMD_KILL  = "KILL"
+    __CMD_QUIT  = "QUIT"
 
     def __init__(self, address, port):
         """
@@ -107,12 +107,14 @@ class Server:
 
         while True:
             ready_sockets = select.select(self.__sockets, [], [])[0]
+
             for socket in ready_sockets:
                 if socket == self.__socket:
                     self.__handle_new()
                 else:
                     raw_request = socket.recv(1500)
                     request = raw_request.decode("utf-8")
+
                     if len(raw_request) > 0:
                         if self.__CMD_MSG in request:
                             self.__handle_message(socket, request)
